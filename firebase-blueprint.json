@@ -1,0 +1,135 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Enterprise ERP user account profile with role and branch permissions",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Unique Firebase Auth user ID" },
+        "name": { "type": "string", "description": "Full name of the user" },
+        "displayName": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "format": "email", "description": "Corporate user email address" },
+        "role": { 
+          "type": "string", 
+          "enum": ["admin", "manager"], 
+          "description": "Assigned access control role" 
+        },
+        "branch": { "type": "string", "description": "Assigned operational branch" },
+        "phone": { "type": "string", "description": "Contact telephone number" },
+        "active": { "type": "boolean", "description": "Account active flag" },
+        "status": { "type": "string", "enum": ["active", "suspended"], "description": "Account status" },
+        "mustChangePassword": { "type": "boolean", "description": "Force password change on first sign in" },
+        "createdAt": { "type": "string", "description": "ISO timestamp of account creation" },
+        "lastLogin": { "type": "string", "description": "ISO timestamp of last sign in" }
+      },
+      "required": ["uid", "email", "role", "branch", "active", "createdAt"]
+    },
+    "AccountTransaction": {
+      "title": "AccountTransaction",
+      "description": "Financial Payment and Deposit voucher transaction record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "voucherNo": { "type": "string", "description": "Sequential voucher number e.g. PV-0001 or DV-0001" },
+        "transactionType": { "type": "string", "enum": ["PAYMENT", "DEPOSIT"] },
+        "subType": { "type": "string" },
+        "date": { "type": "string", "description": "Transaction date YYYY-MM-DD" },
+        "amount": { "type": "number", "minimum": 0.01 },
+        "accountHeadId": { "type": "string" },
+        "accountHeadName": { "type": "string" },
+        "partyType": { "type": "string", "enum": ["Customer", "Supplier", "None"] },
+        "partyId": { "type": "string" },
+        "partyName": { "type": "string" },
+        "bankAccountId": { "type": "string" },
+        "bankAccountName": { "type": "string" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "Bank Transfer", "Cheque", "Mobile Banking"] },
+        "referenceNo": { "type": "string" },
+        "note": { "type": "string" },
+        "branch": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "voided"] },
+        "voidReason": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "voucherNo", "transactionType", "subType", "date", "amount", "bankAccountId", "branch", "status", "createdAt"]
+    },
+    "AccountHead": {
+      "title": "AccountHead",
+      "description": "Chart of accounts category head for expense, income and other operations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "nameEn": { "type": "string" },
+        "nameBn": { "type": "string" },
+        "type": { "type": "string", "enum": ["Expense", "Income", "Other"] },
+        "code": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "type", "active"]
+    },
+    "AccountLedger": {
+      "title": "AccountLedger",
+      "description": "Double-entry financial ledger item linked to cash/bank or account head",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "voucherNo": { "type": "string" },
+        "date": { "type": "string" },
+        "accountType": { "type": "string" },
+        "accountId": { "type": "string" },
+        "accountName": { "type": "string" },
+        "debit": { "type": "number" },
+        "credit": { "type": "number" },
+        "runningBalance": { "type": "number" },
+        "branch": { "type": "string" },
+        "status": { "type": "string" }
+      },
+      "required": ["id", "transactionId", "voucherNo", "date", "accountType", "accountId", "branch", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "System authentication and access audit record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "User ID performing the action" },
+        "userEmail": { "type": "string", "description": "Email of the user" },
+        "action": { "type": "string", "description": "Action performed: login, logout, role_change, user_created" },
+        "timestamp": { "type": "string", "description": "ISO timestamp" },
+        "details": { "type": "string", "description": "Description of the event" }
+      },
+      "required": ["userId", "userEmail", "action", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of ERP users and their roles"
+    },
+    "/account_transactions/{txnId}": {
+      "schema": "AccountTransaction",
+      "description": "Payment and Deposit vouchers"
+    },
+    "/account_heads/{headId}": {
+      "schema": "AccountHead",
+      "description": "Chart of accounts category heads"
+    },
+    "/account_ledgers/{ledgerId}": {
+      "schema": "AccountLedger",
+      "description": "Double entry ledger logs"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AuditLog",
+      "description": "Immutable log of user access and security events"
+    },
+    "/letters_of_credit/{lcId}": {
+      "schema": "LetterOfCredit",
+      "description": "Letter of Credit import instruments with margin voucher linkage"
+    },
+    "/lc_number_registry/{normalizedLcNumber}": {
+      "schema": "LcNumberRegistry",
+      "description": "Unique index of claimed uppercase normalized LC numbers to prevent duplicate LC creation"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Enterprise Import Trading ERP System",
+  "description": "Comprehensive ERP software system for import, trading, and distribution businesses covering LC management, inventory, sales, procurement, accounting, and HR.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

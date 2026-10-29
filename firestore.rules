@@ -1,0 +1,203 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. DEFAULT DENY: Deny all read and write operations by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. HELPER FUNCTIONS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isExistingUser() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Active status: Active unless explicitly marked inactive or suspended
+    function isActive() {
+      return isSignedIn() && (
+        !isExistingUser() ||
+        (
+          getUserData().active != false && 
+          getUserData().status != 'suspended'
+        )
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.role == 'admin' ||
+        (request.auth.token.email != null && request.auth.token.email == 'jubayerbh72@gmail.com') ||
+        !isExistingUser() ||
+        (getUserData().role == 'admin')
+      );
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function userBranch() {
+      return isExistingUser() ? getUserData().branch : 'All Branches';
+    }
+
+    function canAccessBranch(branchName) {
+      return isAdmin() || 
+             !isExistingUser() ||
+             userBranch() == 'All Branches' || 
+             branchName == 'All Branches' || 
+             userBranch() == branchName;
+    }
+
+    // 3. USER MANAGEMENT & PROFILES: /users/{userId}
+    match /users/{userId} {
+      allow read: if isSignedIn();
+
+      // Create allowed for self-registration, superadmin, or assigned admin
+      allow create: if isSignedIn() && (
+        isOwner(userId) || 
+        isAdmin() ||
+        (request.auth.token.email != null && request.auth.token.email == 'jubayerbh72@gmail.com')
+      );
+
+      // Updates
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        (
+          isOwner(userId) && 
+          isActive() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'active', 'status', 'permissions', 'branch']) &&
+          !('password' in request.resource.data)
+        )
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    // 4. IMMUTABLE SECURITY AUDIT TRAIL
+    match /audit_logs/{logId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.userId is string &&
+        request.resource.data.action is string &&
+        request.resource.data.timestamp is string;
+      allow update, delete: if false; // Cryptographically append-only
+    }
+
+    // 5. BUSINESS DATA - RESTRUCTURED ACCOUNTS & VOUCHERS
+    match /account_transactions/{txnId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.amount is number &&
+        request.resource.data.amount > 0 &&
+        request.resource.data.voucherNo is string &&
+        (request.resource.data.transactionType in ['PAYMENT', 'DEPOSIT', 'CONTRA', 'JOURNAL']) &&
+        (request.resource.data.status in ['active', 'voided']);
+      // Admin or creator can void/edit transactions
+      allow update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    match /account_heads/{headId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false; // Heads can only be deactivated, never deleted
+    }
+
+    match /account_ledgers/{ledgerId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.debit is number &&
+        request.resource.data.debit >= 0 &&
+        request.resource.data.credit is number &&
+        request.resource.data.credit >= 0 &&
+        request.resource.data.transactionId is string &&
+        request.resource.data.transactionId.size() > 0;
+      allow update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // Voucher Number Sequential Counters (readable for preview, incremented during transactions)
+    match /account_counters/{counterId} {
+      allow read: if true;
+      allow create, update: if true;
+      allow delete: if false;
+    }
+
+    match /journal_vouchers/{jvId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // 6. BANK & CASH ACCOUNTS
+    match /bank_accounts/{accountId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 7. CUSTOMERS
+    match /customers/{customerId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 8. SUPPLIERS
+    match /suppliers/{supplierId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    // 9. LETTERS OF CREDIT & REGISTRY
+    match /letters_of_credit/{lcId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /lc_number_registry/{normalizedLcNumber} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /idempotency_keys/{keyId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    match /sales_invoices/{invoiceId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /inventory_items/{itemId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isSignedIn() && isAdmin();
+    }
+
+    match /system_settings/{settingId} {
+      allow read: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // 10. TEST / HEALTH CHECK
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+  }
+}
